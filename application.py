@@ -42,10 +42,11 @@ def color_norm(img):
     return img
 
 @app.route('/api/segmentation', methods=['GET', 'POST'])
-def segmentation(img, mean, std):
+def segmentation():
     content = request.json
-    hashtable = content.json()
+    hashtable = json.loads(content) #content.json()
     img = hashtable["img"]
+    import numpy as np
     img = np.array(img)
     mean = hashtable["mean"]
     std = hashtable["std"]
@@ -155,7 +156,7 @@ def segmentation(img, mean, std):
     x, y, w, h = box
     hashtable = {'x': x, 'y': y, 'w': w, 'h': h}
     content = json.dumps(hashtable)
-    return box
+    return content
 
 @app.route('/api/add_message/<uuid>', methods=['GET', 'POST'])
 def add_message(uuid):
