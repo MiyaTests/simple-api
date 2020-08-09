@@ -1,7 +1,8 @@
 from flask import Flask
 from flask import request, jsonify
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
+import numpy as np
+from numpy import linalg as la
+from random import randint
 import json
 
 # Elastic Beanstalk looks for an 'application' that is callable by default
@@ -13,6 +14,24 @@ def hello_world():
     return 'Your Server is working!'
 
 # REST API
+@app.route('/api/get_ref', methods=['GET', 'POST'])
+def get_ref():
+    content = request.json
+    img = json.loads(content)
+    L = 100
+    img = np.array(img)
+    d1, d2, d3 = img.shape
+    img = img.reshape((d1*d2, d3))
+    for pixel in img:
+        pixel[0] = int(L*pixel[0]/la.norm(pixel))
+        pixel[1] = int(L*pixel[1]/la.norm(pixel))
+        pixel[2] = int(L*pixel[2]/la.norm(pixel))
+    mean = np.mean(img, axis=0)
+    std = np.std(img, axis=0)
+    hashtable = {"mean": mean.tolist(), "std": std.tolist()}
+    content = json.dumps(hashtable)
+    return content
+
 @app.route('/api/add_message/<uuid>', methods=['GET', 'POST'])
 def add_message(uuid):
     content = request.json
@@ -37,13 +56,6 @@ def read_file():
     except:
         content = json.dumps("erro ao ler o arquivo")
     return content
-
-@app.route('/api/show_image', methods=['GET', 'POST'])
-def show_image():
-    img = mpimg.imread("image.jpg")
-    plt.imshow(img)
-    plt.show()
-    return json.dumps("your image")
 
 # Run the application
 if __name__ == "__main__":
