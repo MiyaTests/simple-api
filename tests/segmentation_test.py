@@ -12,8 +12,10 @@ frame = frame.tolist()
 hashtable = {"img": frame, "mean": mean, "std": std}
 data = json.dumps(hashtable)
 print(sys.getsizeof(data))
-res = requests.post('http://aws-test.eba-gajbic4g.sa-east-1.elasticbeanstalk.com/api/segmentation', json = data)
-#res = requests.post('http://localhost:5000/api/segmentation', json = data)
+try:
+    res = requests.post('http://aws-test.eba-gajbic4g.sa-east-1.elasticbeanstalk.com/api/segmentation', json = data)
+except:
+    res = requests.post('http://localhost:5000/api/segmentation', json = data)
 if res.ok:
     print("res ok")
     res = res.json()
