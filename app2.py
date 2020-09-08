@@ -4,6 +4,7 @@ import numpy as np
 from numpy import linalg as la
 from random import randint
 import json
+import cv2 
 
 # Elastic Beanstalk looks for an 'application' that is callable by default
 app = Flask(__name__)
@@ -46,10 +47,10 @@ def segmentation():
     content = request.json
     hashtable = json.loads(content) #content.json()
     img = hashtable["img"]
-    import numpy as np
+    #import numpy as np
     img = np.array(img)
     mean = hashtable["mean"]
-    std = hashtable["std"]
+    std = np.array(hashtable["std"])
     img_map = []
     img_size = len(img)*len(img[0])
     img_dim = [len(img), len(img[0])]
@@ -57,18 +58,44 @@ def segmentation():
 
     # normalize ilunmination
     img = color_norm(img)
+    #mean, std = get_ref(ref)
     std = std*6
+    print("mean: (%f, %f, %f), std: (%f, %f, %f)"%(mean[0], mean[1], mean[2], std[0], std[1], std[2]))
 
     # color filter
     for line in img:
         temp = []
         for pixel in line:
+            #print(pixel)
+            #print(mean)
             dev = abs(pixel - mean)
             if dev[0] < std[0] and dev[1] < std[1] and dev[2] < std[2]:
+            #if pixel[0] > th and pixel[1] > th and pixel[2] > th:
+                #pixel[0] = 0
                 temp.append(-1)
                 count += 1
             else: temp.append(0)
         img_map.append(temp)
+
+    #print(count)
+
+    # laplacian operator
+    #for l in range(len(img)):
+        #temp = []
+        #for p in range(len(line)):
+            #try:
+                #la_red = (4*img[l][p][0] - img[l+1][p][0] - img[l-1][p][0] - img[l][p+1][0] - img[l][p-1][0]) / (4*255)
+                #la_gre = (4*img[l][p][0] - img[l+1][p][0] - img[l-1][p][0] - img[l][p+1][0] - img[l][p-1][0]) / (4*255)
+                #la_blu = (4*img[l][p][0] - img[l+1][p][0] - img[l-1][p][0] - img[l][p+1][0] - img[l][p-1][0]) / (4*255)
+            #except:
+                #la_red = 0
+                #la_gre = 0
+                #la_blu = 0
+            #if la_red > th_red or la_gre > th_gre or la_blu > th_blu:
+                #temp.append(-1)
+                #count += 1
+            #else: temp.append(0)
+        #img_map.append(temp)
 
     # region growing
     group = 1
@@ -86,10 +113,11 @@ def segmentation():
         while len(stack) > 0:
             l, w = stack.pop()
             count += 1
+            #print("count: %d, size: %d, stack: %d"%(count, img_size, len(stack)))
             try:
                 if img_map[l-1][w] == 0:
                     stack.append((l-1, w))
-                    img_map[l-1][w] = group
+                    img_map[l-1][w] = group 
                 if img_map[l+1][w] == 0:
                     stack.append((l+1, w))
                     img_map[l+1][w] = group
@@ -116,43 +144,52 @@ def segmentation():
                 if len(border_gp) == 0 or border_gp[-1] != group: border_gp.append(group)
         group += 1
 
+    #print(group)
     # temp modify img and identify groups
     objs = []
     groups = []
     for i in range(img_dim[0]):
         for j in range(img_dim[1]):
+            pixel = img[i][j]
             gp = img_map[i][j]
-            if gp > 0 and gp not in border_gp:
+            if gp in border_gp:
+                pixel[1] = 0
+            elif gp > 0:
+                pixel[2] = 0
                 if gp in groups:
                     objs[groups.index(gp)].append((i, j))
                 else:
                     groups.append(gp)
                     objs.append([(i, j)])
 
+    
     # create rectangle
+    boxes = []
     max_value = 0
     for obj in objs:
         min_x = img_dim[1]
         min_y = img_dim[0]
         max_x = 0
         max_y = 0
-        np    = 0
+        npix  = 0 
         for i, j in obj:
-            np += 1
+            npix += 1
             if j > max_x: max_x = j
             if j < min_x: min_x = j
             if i > max_y: max_y = i
             if i < min_y: min_y = i
-        if np > max_value:
+        if npix > max_value:
             w = max_x - min_x
             h = max_y - min_y
             x = float(min_x + w/2)/img_dim[1]
             y = float(min_y + h/2)/img_dim[0]
             w = float(w)/img_dim[1]
             h = float(h)/img_dim[0]
-            max_value = np
+            max_value = npix
             box = (x, y, w, h)
 
+    #print(max_value)
+    #print(box)
     x, y, w, h = box
     hashtable = {'x': x, 'y': y, 'w': w, 'h': h}
     content = json.dumps(hashtable)
